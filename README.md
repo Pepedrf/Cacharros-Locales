@@ -1,4 +1,4 @@
-# 🍺 Rondas — el diario de copas de la peña
+# 🍺 Cacharros Locales — el diario de cacharros de los Héroes Locales
 
 Red social privada tipo Letterboxd para apuntar cada cerveza, copa, vino, cóctel o chupito: foto, precio, nota del 1 al 10, sitio y reseña. Cada perfil tiene su diario, estadísticas, histograma de notas y favoritas. También hay un ranking de la peña con los bares, las mejor valoradas y los récords.
 

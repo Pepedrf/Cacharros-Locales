@@ -1,6 +1,6 @@
 {
-  "name": "Rondas · El diario de copas de la peña",
-  "short_name": "Rondas",
+  "name": "Cacharros Locales · El diario de los Héroes Locales",
+  "short_name": "Cacharros",
   "start_url": "./#/feed",
   "scope": "./",
   "display": "standalone",

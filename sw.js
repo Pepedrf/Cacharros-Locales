@@ -1,6 +1,6 @@
 // Service worker: permite instalar la app y abrirla sin conexión (los datos necesitan red).
 // Estrategia "network-first": siempre intenta lo más nuevo y usa la caché solo si no hay red.
-const CACHE = 'rondas-v1';
+const CACHE = 'cacharros-v2';
 const SHELL = ['./', './index.html', './css/app.css', './js/app.js', './js/util.js', './js/stats.js',
   './js/config.js', './js/api-supabase.js', './js/api-demo.js', './manifest.webmanifest', './icons/icon-192.png'];
 
