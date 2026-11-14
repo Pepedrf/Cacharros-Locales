@@ -23,12 +23,12 @@ svg { width: 22px; height: 22px; flex: none; }
 body.authed #app { padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 16px); }
 
 /* ---------- Top bar ---------- */
-.top { position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+.top { position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: auto 1fr auto; align-items: center;
   gap: 8px; padding: calc(env(safe-area-inset-top) + 8px) 12px 8px; background: rgba(14,16,19,.82);
   backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); border-bottom: 1px solid var(--line); }
 #top-t { font: 600 16px var(--f-display); text-align: center; white-space: nowrap; }
 #top-r { display: flex; justify-content: flex-end; gap: 4px; }
-.logo { display: inline-flex; align-items: center; gap: 8px; font: 800 22px var(--f-display); letter-spacing: -0.03em; }
+.logo { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; font: 800 21px var(--f-display); letter-spacing: -0.03em; }
 .logo-glass { width: 30px; height: 30px; }
 .icon-btn { width: 40px; height: 40px; display: inline-grid; place-items: center; border-radius: 12px; color: var(--tx); }
 .icon-btn:active { background: var(--s2); }
@@ -204,7 +204,7 @@ input[type="datetime-local"] { min-height: 50px; }
 .auth { padding: calc(env(safe-area-inset-top) + 32px) 0 40px; }
 .auth-hero { text-align: center; padding: 20px 24px 28px; }
 .auth-hero .logo-glass { width: 76px; height: 76px; margin: 0 auto 6px; filter: drop-shadow(0 14px 30px rgba(255,176,0,.35)); }
-.auth-hero h1 { font-size: 44px; font-weight: 800; letter-spacing: -0.04em; }
+.auth-hero h1 { font-size: 38px; line-height: 1.05; font-weight: 800; letter-spacing: -0.04em; }
 .auth-hero p { color: var(--mu); margin: 4px 0 0; }
 .auth-form { display: flex; flex-direction: column; gap: 14px; padding: 0 16px; }
 .demo-box { margin: 24px 16px 0; padding: 14px 16px; border-radius: 16px; background: rgba(255,176,0,.07); border: 1px dashed rgba(255,176,0,.35); }
