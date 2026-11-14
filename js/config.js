@@ -11,8 +11,8 @@
 //  ejemplo guardados solo en tu navegador.
 // ============================================================
 export const CONFIG = {
-  APP_NAME: 'Rondas',
-  TAGLINE: 'El diario de copas de la peña',
+  APP_NAME: 'Cacharros Locales',
+  TAGLINE: 'El diario de cacharros de los Héroes Locales',
   SUPABASE_URL: 'https://qtsudnwajjwcuqitflmc.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_u8DOQu1r9I0eoaBQEiI0Gg_EAHwwLiy',
 };

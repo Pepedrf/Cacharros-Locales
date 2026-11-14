@@ -1,7 +1,7 @@
 // Utilidades compartidas
 export const TYPES = [
   { id: 'cerveza', label: 'Cerveza', plural: 'Cervezas', emoji: '🍺', color: '#FFB000' },
-  { id: 'copa',    label: 'Copa',    plural: 'Copas',    emoji: '🍹', color: '#2EC4B6' },
+  { id: 'copa',    label: 'Cacharro', plural: 'Cacharros',    emoji: '🍹', color: '#2EC4B6' },
   { id: 'vino',    label: 'Vino',    plural: 'Vinos',    emoji: '🍷', color: '#E8506A' },
   { id: 'coctel',  label: 'Cóctel',  plural: 'Cócteles', emoji: '🍸', color: '#B57BFF' },
   { id: 'chupito', label: 'Chupito', plural: 'Chupitos', emoji: '🥃', color: '#FF7A3D' },

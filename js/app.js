@@ -182,7 +182,7 @@ function viewAuth() {
       const r = await S.api.signUp({ email: f.email.value.trim(), password: f.password.value, username,
         display_name: f.display_name.value.trim(), invite: f.invite.value.trim() });
       if (r.needsConfirm) { toast('Cuenta creada. Revisa tu email para confirmarla y luego entra.'); $('[data-auth="login"]').click(); }
-      else { S.me = r.user; await enter(); toast(`¡Bienvenido a la peña, ${S.me.display_name}! 🍻`); }
+      else { S.me = r.user; await enter(); toast(`¡Bienvenido a los Héroes Locales, ${S.me.display_name}! 🍻`); }
     } catch (err) { toast(errMsg(err), 'err'); } finally { busy(f, false); }
   };
   $('[data-action="forgot"]').onclick = async () => {
@@ -429,7 +429,7 @@ function statBlock(sum) {
   <div class="bigstats">
     <div><b>${sum.total}</b><small>Total</small></div>
     <div><b>${sum.byType.cerveza}</b><small>🍺 Cervezas</small></div>
-    <div><b>${sum.byType.copa}</b><small>🍹 Copas</small></div>
+    <div><b>${sum.byType.copa}</b><small>🍹 Cacharros</small></div>
     <div><b>${sum.spent >= 100 ? fmtNum(Math.round(sum.spent), 0) + ' €' : fmtMoney(sum.spent).replace(',00', '')}</b><small>Gastado</small></div>
   </div>
   ${sum.total ? `
@@ -507,7 +507,7 @@ async function viewProfile(username) {
 const SORTS = [
   { id: 'total', label: 'Total', val: u => u.total, fmt: v => v },
   { id: 'cerveza', label: '🍺 Cervezas', val: u => u.byType.cerveza, fmt: v => v },
-  { id: 'copa', label: '🍹 Copas', val: u => u.byType.copa, fmt: v => v },
+  { id: 'copa', label: '🍹 Cacharros', val: u => u.byType.copa, fmt: v => v },
   { id: 'spent', label: '€ Gasto', val: u => u.spent, fmt: v => fmtMoney(v) },
   { id: 'avg', label: '★ Nota media', val: u => u.avgRating ?? -1, fmt: v => v < 0 ? '—' : fmtNum(v) },
 ];
@@ -573,7 +573,7 @@ async function viewPeople() {
   const [profiles, rows] = await Promise.all([S.api.listProfiles(), getRows()]);
   S.profiles = profiles;
   const users = ST.perUser(rows, profiles).sort((a, b) => (b.last || '').localeCompare(a.last || ''));
-  view().innerHTML = `<section><h1 class="page-h">La peña <span class="muted">· ${profiles.length}</span></h1>
+  view().innerHTML = `<section><h1 class="page-h">Héroes Locales <span class="muted">· ${profiles.length}</span></h1>
     <div class="people">${users.map(u => `<a class="person" href="#/u/${esc(u.profile.username)}">${avatarHtml(u.profile, 48)}
       <span class="pm"><b>${esc(u.profile.display_name)}</b><small>${u.last ? 'Última: ' + timeAgo(u.last) : 'Aún sin estrenarse'}</small></span>
       <span class="pc"><span>🍺 ${u.byType.cerveza}</span><span>🍹 ${u.byType.copa}</span><span class="muted">Σ ${u.total}</span></span></a>`).join('')}</div></section>`;
@@ -599,7 +599,7 @@ function viewSettings() {
     ${S.api.demo ? `<div class="panel"><h4>Modo demo</h4><p class="small">Los datos son de ejemplo y viven solo en este navegador.</p>
       <button class="btn ghost sm" data-action="reset-demo">Resetear datos de ejemplo</button></div>` : ''}
     <button class="btn danger-ghost big" data-action="logout">Cerrar sesión</button>
-    <p class="muted small center">${esc(CONFIG.APP_NAME)} · hecho para la peña 🍻</p>
+    <p class="muted small center">${esc(CONFIG.APP_NAME)} · hecho para los Héroes Locales 🍻</p>
   </section>`;
   if (window.__installPrompt) { const b = $('#installBtn'); b.hidden = false; b.onclick = async () => { window.__installPrompt.prompt(); window.__installPrompt = null; b.hidden = true; }; }
   $('#avIn').onchange = async (e) => {
