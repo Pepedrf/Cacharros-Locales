@@ -106,7 +106,7 @@ function popupHtml(d, i, start) {
   const t = TYPE[d.type] || TYPE.otro, img = d.thumb_url || d.photo_url;
   const since = start ? Math.round((new Date(d.drunk_at) - start) / 60000) : null;
   return `<a class="mpop" href="#/d/${esc(d.id)}">${img ? `<img src="${esc(img)}" alt="">` : `<span class="mpop-e">${t.emoji}</span>`}
-    <span class="mpop-b"><b>#${i + 1} ${t.emoji} ${esc(d.name || t.label)}</b>
+    <span class="mpop-b"><b>#${i + 1} ${t.emoji} ${esc(d.place || d.name || t.label)}</b>
     <small>${hhmm(d.drunk_at)}${since != null ? ` · +${fmtDur(Math.max(0, since))}` : ''}</small>
     ${d.note ? `<em>${esc(d.note)}</em>` : ''}</span>
     <span class="score ${ratingClass(d.rating)}">${d.rating}</span></a>`;

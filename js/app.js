@@ -2,7 +2,7 @@ import { CONFIG } from './config.js';
 import { TYPES, TYPE, PERIODS, esc, fmtMoney, fmtNum, timeAgo, fmtDateTime, monthLabel, toLocalInput,
   ratingClass, normName, avatarHtml, periodSince, processImage, processAvatar } from './util.js';
 import * as ST from './stats.js';
-import { getPosition, geoGranted, round5 } from './geo.js';
+import { getPosition, geoGranted, round5, nearbyVenues, knownPlacesNear, fmtDist } from './geo.js';
 import * as RD from './ronda.js';
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -108,6 +108,7 @@ function cardHtml(d) {
     <a class="card-media" href="#/d/${esc(d.id)}" data-dbl="${esc(d.id)}">${media(d)}${score(d.rating)}</a>
     <div class="card-b">
       ${d.name ? `<h3>${esc(d.name)}</h3>` : ''}
+      ${d.place ? `<div class="meta place-meta"><span>${I.pin}${esc(d.place)}</span></div>` : ''}
       ${d.note ? `<p class="note${d.name ? '' : ' lead'}">${esc(d.note)}</p>` : ''}
       ${d.outing_id ? `<a class="meta ronda-tag" href="#/r/${esc(d.outing_id)}">${I.map}<span>En una ronda de bares</span></a>` : ''}
     </div>
@@ -349,7 +350,9 @@ async function viewForm(editId) {
   }
   let lastType = null; try { lastType = localStorage.getItem('cl_lastType'); } catch { }
   const st = { type: d?.type || (TYPE[lastType] ? lastType : 'cerveza'), rating: d?.rating || null, photo: null,
-    existing: d?.photo_url || null, removeOld: false, when: d ? new Date(d.drunk_at) : null };
+    existing: d?.photo_url || null, removeOld: false, when: d ? new Date(d.drunk_at) : null,
+    geo: null, nearList: [], placeCoords: d && d.lat != null && d.place ? { lat: d.lat, lng: d.lng, name: d.place } : null };
+  const rows = await getRows().catch(() => []);
 
   view().innerHTML = `
   <form id="dform" class="dform quick" novalidate>
@@ -368,6 +371,12 @@ async function viewForm(editId) {
 
     <div class="field"><span class="lbl">Nota <b id="rateOut" class="rate-out"></b></span>
       <div class="rate" role="radiogroup">${Array.from({ length: 10 }, (_, i) => `<button type="button" class="${ratingClass(i + 1)}" data-rate="${i + 1}" role="radio">${i + 1}</button>`).join('')}</div></div>
+
+    <div class="field"><label class="lbl" for="fPlace">¿Dónde estás?</label>
+      <div class="place-row"><input id="fPlace" list="dlPlaces" maxlength="80" autocomplete="off" placeholder="Bar, terraza, casa de alguien…" value="${esc(d?.place || '')}">
+        <button type="button" class="geo-btn" id="geoBtn" aria-label="Buscar sitios cerca">${I.pin}</button></div>
+      <datalist id="dlPlaces"></datalist>
+      <div class="near" id="near"></div></div>
 
     <label class="field"><span class="lbl">Reseña <small class="muted">(opcional)</small></span>
       <textarea id="fNote" rows="2" maxlength="1000" placeholder="¿Qué tal estaba?">${esc(d?.note || '')}</textarea></label>
@@ -391,6 +400,45 @@ async function viewForm(editId) {
   if (fw) fw.onchange = (e) => { st.when = e.target.value ? new Date(e.target.value) : null;
     $('#whenTxt').textContent = st.when ? fmtDateTime(st.when.toISOString()) : 'ahora mismo'; };
 
+  // ---- Sitio: sugerencias de la peña (★) + bares cercanos de OpenStreetMap ----
+  const freq = (arr) => { const m = new Map(); for (const v of arr) { if (!v) continue; const k = normName(v);
+    const x = m.get(k) || { v, n: 0 }; x.n++; m.set(k, x); } return [...m.values()].sort((a, b) => b.n - a.n).map(x => x.v); };
+  $('#dlPlaces').innerHTML = freq(rows.map(r => r.place)).slice(0, 40).map(v => `<option value="${esc(v)}">`).join('');
+  const near = $('#near');
+  const pickPlace = (p) => {
+    $('#fPlace').value = p.name; st.placeCoords = { lat: p.lat, lng: p.lng, name: p.name };
+    $$('.near-chip').forEach(c => c.classList.toggle('on', c.dataset.name === p.name));
+  };
+  async function locate(auto = false) {
+    const btn = $('#geoBtn'); if (!btn) return; btn.classList.add('busy');
+    near.innerHTML = `<p class="near-msg">Buscando dónde estás…</p>`;
+    try {
+      const pos = await getPosition({ timeout: 12000, maximumAge: 60000 });
+      st.geo = pos;
+      const known = knownPlacesNear(rows, pos, 200);
+      let osm = [];
+      try { osm = await nearbyVenues(pos, 150); } catch { /* sin mapa: solo sitios de la peña */ }
+      if (!$('#near')) return;
+      const seen = new Set(known.map(k => normName(k.name)));
+      const list = [...known, ...osm.filter(o => !seen.has(normName(o.name)))].slice(0, 8);
+      st.nearList = list;
+      near.innerHTML = (list.length ? `<div class="near-chips">${list.map((p, i) => `<button type="button" class="near-chip ${p.n ? 'known' : ''}" data-i="${i}" data-name="${esc(p.name)}">${p.n ? '★ ' : ''}${esc(p.name)} <small>${fmtDist(p.dist)}${p.n ? ` · ${p.n}×` : ''}</small></button>`).join('')}</div>` : '')
+        + `<p class="near-msg">${list.length ? '¿No está?' : 'No encuentro bares aquí.'} Escríbelo (p. ej. «Casa de Javi») y quedará guardado en este punto para la próxima.</p>`;
+      const cur = $('#fPlace').value.trim();
+      const match = cur && list.find(p => normName(p.name) === normName(cur));
+      if (match) pickPlace(match);
+      else if (!cur) { const nearest = [...list].sort((x, y) => x.dist - y.dist)[0]; if (nearest && nearest.dist <= 25) pickPlace(nearest); }
+    } catch (err) {
+      near.innerHTML = `<p class="near-msg">${esc(err.message)}</p>`;
+    } finally { btn.classList.remove('busy'); }
+  }
+  near.onclick = (e) => { const c = e.target.closest('.near-chip'); if (c) pickPlace(st.nearList[+c.dataset.i]); };
+  $('#geoBtn').onclick = () => locate(false);
+  $('#fPlace').addEventListener('input', () => {
+    if (st.placeCoords && st.placeCoords.name !== $('#fPlace').value) { st.placeCoords = null; $$('.near-chip').forEach(c => c.classList.remove('on')); }
+  });
+  if (!d) locate(true);
+
   $$('.ph-in').forEach(inp => { inp.onchange = async (e) => {
     const file = e.target.files?.[0]; if (!file) return;
     $('#pp').classList.add('busy');
@@ -409,18 +457,24 @@ async function viewForm(editId) {
   $('#dform').onsubmit = async (e) => {
     e.preventDefault();
     if (!st.rating) return toast('Ponle nota del 1 al 10', 'err');
-    const data = { type: st.type, rating: st.rating, note: $('#fNote').value.trim() || null,
+    const placeName = $('#fPlace').value.trim();
+    if (!placeName) { $('#fPlace').focus(); return toast('¿Dónde estás? Elige o escribe el sitio', 'err'); }
+    const data = { type: st.type, rating: st.rating, note: $('#fNote').value.trim() || null, place: placeName,
       drunk_at: (st.when || new Date()).toISOString() };
+    const chosen = (st.placeCoords && st.placeCoords.name === placeName) ? st.placeCoords : null;
+    const knownPlace = rows.find(r => r.lat != null && normName(r.place) === normName(placeName));
     const btn = $('#saveBtn'); btn.disabled = true; btn.classList.add('busy');
     try {
       if (d) {
+        if (placeName !== d.place) { const c = chosen || knownPlace; if (c) { data.lat = round5(c.lat); data.lng = round5(c.lng); } }
         await S.api.updateDrink(d.id, data, { photo: st.photo, removeOld: st.removeOld, oldPath: d.photo_path });
         invalidate(); toast('Guardado'); history.back(); return;
       }
       Object.assign(data, { name: null, quantity: 1 });
-      const pos = inRonda ? await quickPos(8000) : ((await geoGranted()) ? await quickPos(5000) : null);
-      if (pos) { data.lat = round5(pos.lat); data.lng = round5(pos.lng); }
-      if (inRonda) { data.outing_id = S.outing.id; if (pos) S.tracker?.add(pos.lat, pos.lng, 0, true); }
+      const here = st.geo || (inRonda ? await quickPos(8000) : null);
+      const c = chosen || here || knownPlace || null;
+      if (c) { data.lat = round5(c.lat); data.lng = round5(c.lng); }
+      if (inRonda) { data.outing_id = S.outing.id; const t = here || c; if (t) S.tracker?.add(t.lat, t.lng, 0, true); }
       await S.api.createDrink(data, st.photo);
       try { localStorage.setItem('cl_lastType', st.type); } catch { }
       invalidate();
@@ -550,6 +604,7 @@ async function viewRanking() {
     const so = SORTS.find(s => s.id === sort);
     users.sort((a, b) => so.val(b) - so.val(a) || b.total - a.total);
     const maxT = Math.max(1, ...users.map(u => u.total));
+    const places = ST.topPlaces(rs, 8);
     const tops = [...rs].sort((a, b) => b.rating - a.rating || (b.thumb_url ? 1 : 0) - (a.thumb_url ? 1 : 0) || b.drunk_at.localeCompare(a.drunk_at)).slice(0, 6);
     const os = outs.filter(o => !since || new Date(o.started_at) >= since).map(o => ({ o, st: RD.outingStats(o) }));
     const totN = os.reduce((s, x) => s + x.st.n, 0), totMin = os.reduce((s, x) => s + (x.st.n ? x.st.mins : 0), 0);
@@ -579,6 +634,10 @@ async function viewRanking() {
       <div class="panel"><h4>Top bebidas</h4>
         ${tops.length ? `<div class="favs six">${tops.map(r => `<a class="fav" href="#/d/${esc(r.id)}">${media(r, true)}${score(r.rating)}<span>${esc(profileById(r.user_id)?.display_name || '')}</span></a>`).join('')}</div>`
           : `<p class="muted small">Sin datos en este periodo.</p>`}</div>
+      <div class="panel"><h4>Los bares</h4>
+        ${places.length ? `<ol class="list">${places.map(p => `<li><span class="l-e">${I.pin}</span>
+          <span class="l-main"><b>${esc(p.place)}</b><small>${p.drinks} ${p.drinks === 1 ? 'bebida' : 'bebidas'} · ${p.visits === 1 ? '1 vez' : p.visits + ' veces'}</small></span>
+          ${score(Math.round(p.avg))}</li>`).join('')}</ol>` : `<p class="muted small">Aún no hay sitios apuntados en este periodo.</p>`}</div>
       <div class="panel"><h4>Récords de ronda</h4>
         ${os.length ? `<div class="records">
           ${rec(recMost, '🍻', 'Más bebidas en una ronda', recMost?.st.n)}
@@ -662,7 +721,7 @@ function timelineHtml(o, drinks) {
     const t = TYPE[d.type] || TYPE.otro, since = Math.max(0, Math.round((new Date(d.drunk_at) - start) / 60000));
     return `<li><a href="#/d/${esc(d.id)}"><span class="tl-t"><b>${RD.hhmm(d.drunk_at)}</b><small>+${RD.fmtDur(since)}</small></span>
       <span class="dthumb">${media(d, true)}</span>
-      <span class="dmain"><b>#${i + 1} ${t.emoji} ${esc(d.name || t.label)}</b><small>${esc(d.note || '')}</small></span>${score(d.rating)}</a></li>`;
+      <span class="dmain"><b>#${i + 1} ${t.emoji} ${esc(d.place || d.name || t.label)}</b><small>${esc(d.note || (d.place ? t.label : ''))}</small></span>${score(d.rating)}</a></li>`;
   }).join('')}</ol>`;
 }
 function typesPanel(st, title) {

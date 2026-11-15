@@ -7,7 +7,7 @@ const DETAIL_SELECT = `*, ${AUTHOR}, likes(user_id, profile:profiles(id,username
   comments(id, body, created_at, user_id, author:profiles(id,username,display_name,avatar_url))`;
 const STATS_COLS = 'id,user_id,type,name,place,lat,lng,price,quantity,rating,drunk_at,thumb_url,outing_id';
 const OUT_SELECT = '*, author:profiles!outings_user_id_fkey(id,username,display_name,avatar_url), drinks(id,type,lat,lng,quantity,rating)';
-const OUT_DRINK_COLS = 'id,type,name,rating,note,photo_url,thumb_url,lat,lng,drunk_at,quantity';
+const OUT_DRINK_COLS = 'id,type,name,place,rating,note,photo_url,thumb_url,lat,lng,drunk_at,quantity';
 function normO(o) {
   const drinks = o.drinks || [];
   return { ...o, path: o.path || [], drinks, drink_count: drinks.reduce((s, d) => s + (d.quantity || 1), 0) };
