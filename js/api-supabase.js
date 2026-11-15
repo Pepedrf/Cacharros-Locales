@@ -5,7 +5,13 @@ const AUTHOR = 'author:profiles!drinks_user_id_fkey(id,username,display_name,ava
 const LIST_SELECT = `*, ${AUTHOR}, likes(user_id), comments(count)`;
 const DETAIL_SELECT = `*, ${AUTHOR}, likes(user_id, profile:profiles(id,username,display_name,avatar_url)),
   comments(id, body, created_at, user_id, author:profiles(id,username,display_name,avatar_url))`;
-const STATS_COLS = 'id,user_id,type,name,place,lat,lng,price,quantity,rating,drunk_at,thumb_url';
+const STATS_COLS = 'id,user_id,type,name,place,lat,lng,price,quantity,rating,drunk_at,thumb_url,outing_id';
+const OUT_SELECT = '*, author:profiles!outings_user_id_fkey(id,username,display_name,avatar_url), drinks(id,type,lat,lng,quantity,rating)';
+const OUT_DRINK_COLS = 'id,type,name,rating,note,photo_url,thumb_url,lat,lng,drunk_at,quantity';
+function normO(o) {
+  const drinks = o.drinks || [];
+  return { ...o, path: o.path || [], drinks, drink_count: drinks.reduce((s, d) => s + (d.quantity || 1), 0) };
+}
 
 function norm(r) {
   return {
@@ -143,6 +149,34 @@ export async function createSupabaseApi() {
       const { error } = await sb.from('comments').insert({ drink_id: drinkId, body }); fail(error);
     },
     async deleteComment(id) { const { error } = await sb.from('comments').delete().eq('id', id); fail(error); },
+
+    // ---------- Rondas de bares ----------
+    async activeOuting() {
+      if (!uid) return null;
+      const { data, error } = await sb.from('outings').select(OUT_SELECT).eq('user_id', uid).is('ended_at', null)
+        .order('started_at', { ascending: false }).limit(1);
+      fail(error); return data[0] ? normO(data[0]) : null;
+    },
+    async startOuting({ path = [] } = {}) {
+      const { data, error } = await sb.from('outings').insert({ path }).select(OUT_SELECT).single();
+      fail(error); return normO(data);
+    },
+    async updateOuting(id, patch) { const { error } = await sb.from('outings').update(patch).eq('id', id); fail(error); },
+    async deleteOuting(id) { const { error } = await sb.from('outings').delete().eq('id', id); fail(error); },
+    async getOuting(id) {
+      const { data, error } = await sb.from('outings').select(OUT_SELECT).eq('id', id).maybeSingle();
+      fail(error); if (!data) return null;
+      const { data: drinks, error: e2 } = await sb.from('drinks').select(OUT_DRINK_COLS).eq('outing_id', id).order('drunk_at');
+      fail(e2); return { ...normO(data), drinks };
+    },
+    async listOutings({ userId, before, after, since, limit = 50 } = {}) {
+      let q = sb.from('outings').select(OUT_SELECT).not('ended_at', 'is', null).order('ended_at', { ascending: false }).limit(limit);
+      if (userId) q = q.eq('user_id', userId);
+      if (before) q = q.lt('ended_at', before);
+      if (after) q = q.gte('ended_at', after);
+      if (since) q = q.gte('started_at', since);
+      const { data, error } = await q; fail(error); return data.map(normO);
+    },
 
     // Todas las filas (paginando de 1000 en 1000) para estadísticas
     async statsRows() {

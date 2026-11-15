@@ -1,7 +1,7 @@
 // Ubicación: GPS del móvil + bares cercanos (OpenStreetMap) + sitios guardados por la peña
 import { normName } from './util.js';
 
-export function getPosition() {
+export function getPosition({ timeout = 12000, maximumAge = 60000 } = {}) {
   return new Promise((res, rej) => {
     if (!('geolocation' in navigator)) return rej(new Error('Tu navegador no permite ubicación. Escribe el sitio a mano'));
     navigator.geolocation.getCurrentPosition(
@@ -9,7 +9,7 @@ export function getPosition() {
       e => rej(new Error(e.code === 1
         ? 'Sin permiso de ubicación: actívalo en los ajustes del navegador o escribe el sitio a mano'
         : 'No se pudo obtener tu ubicación. Escribe el sitio a mano')),
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
+      { enableHighAccuracy: true, timeout, maximumAge });
   });
 }
 

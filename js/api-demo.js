@@ -45,13 +45,14 @@ function seed() {
       body: pick(['¡Esa ronda la pagaba yo!', 'Ese sitio es un robo', 'Vamos el viernes otra vez', '¿Un 10? Venga ya 😂', 'Qué buena pinta']),
       created_at: new Date(new Date(d.created_at).getTime() + 3600e3).toISOString() });
   });
-  return { users: people, drinks, likes, comments, session: null };
+  return { users: people, drinks, likes, comments, outings: [], session: null };
 }
 
 export function createDemoApi() {
   let db;
   try { db = JSON.parse(localStorage.getItem(KEY)); } catch { db = null; }
   if (!db) db = seed();
+  db.outings ||= [];
   const save = () => {
     try { localStorage.setItem(KEY, JSON.stringify(db)); }
     catch { throw new Error('Memoria del modo demo llena: borra alguna foto o resetea la demo'); }
@@ -69,6 +70,10 @@ export function createDemoApi() {
       comment_count: comments.length, comments };
   };
   const wait = (v) => new Promise(r => setTimeout(() => r(v), 120));
+  const fullO = (o) => {
+    const drinks = db.drinks.filter(d => d.outing_id === o.id).map(({ id, type, lat, lng, quantity, rating }) => ({ id, type, lat, lng, quantity, rating }));
+    return { ...o, path: [...(o.path || [])], author: pub(db.users.find(u => u.id === o.user_id)), drinks, drink_count: drinks.reduce((s, d) => s + (d.quantity || 1), 0) };
+  };
   async function photoFields(photo) {
     return { photo_url: await blobToDataURL(photo.full), thumb_url: await blobToDataURL(photo.thumb), photo_path: 'demo' };
   }
@@ -136,8 +141,28 @@ export function createDemoApi() {
     async deleteComment(id) { db.comments = db.comments.filter(c => c.id !== id); save(); },
     async statsRows() {
       return wait([...db.drinks].sort((a, b) => b.drunk_at.localeCompare(a.drunk_at))
-        .map(({ id, user_id, type, name, place, lat, lng, price, quantity, rating, drunk_at, thumb_url }) =>
-          ({ id, user_id, type, name, place, lat, lng, price, quantity, rating, drunk_at, thumb_url })));
+        .map(({ id, user_id, type, name, place, lat, lng, price, quantity, rating, drunk_at, thumb_url, outing_id }) =>
+          ({ id, user_id, type, name, place, lat, lng, price, quantity, rating, drunk_at, thumb_url, outing_id })));
+    },
+    // ---------- Rondas de bares ----------
+    async activeOuting() {
+      const o = db.outings.filter(o => o.user_id === db.session && !o.ended_at).sort((a, b) => b.started_at.localeCompare(a.started_at))[0];
+      return wait(o ? fullO(o) : null);
+    },
+    async startOuting({ path = [] } = {}) {
+      const o = { id: 'o' + uidGen(), user_id: db.session, started_at: new Date().toISOString(), ended_at: null, path, distance_m: 0, created_at: new Date().toISOString() };
+      db.outings.push(o); save(); return fullO(o);
+    },
+    async updateOuting(id, patch) { Object.assign(db.outings.find(o => o.id === id), patch); save(); },
+    async deleteOuting(id) { db.outings = db.outings.filter(o => o.id !== id); db.drinks.forEach(d => { if (d.outing_id === id) d.outing_id = null; }); save(); },
+    async getOuting(id) {
+      const o = db.outings.find(o => o.id === id); if (!o) return wait(null);
+      return wait({ ...fullO(o), drinks: db.drinks.filter(d => d.outing_id === id).sort((a, b) => a.drunk_at.localeCompare(b.drunk_at)) });
+    },
+    async listOutings({ userId, before, after, since, limit = 50 } = {}) {
+      return wait(db.outings.filter(o => o.ended_at && (!userId || o.user_id === userId) && (!before || o.ended_at < before)
+        && (!after || o.ended_at >= after) && (!since || o.started_at >= since))
+        .sort((a, b) => b.ended_at.localeCompare(a.ended_at)).slice(0, limit).map(fullO));
     },
   };
 }
