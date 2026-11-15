@@ -192,6 +192,22 @@ input[type="datetime-local"] { min-height: 50px; }
 .stepper button { height: 100%; font-size: 24px; color: var(--amber); }
 .stepper button:active { background: var(--s2); }
 .stepper output { text-align: center; font: 700 20px var(--f-display); }
+.place-row { display: flex; gap: 8px; }
+.place-row input { flex: 1; min-width: 0; }
+.geo-btn { flex: none; width: 52px; border-radius: 14px; background: var(--s1); border: 1px solid var(--line); color: var(--amber); display: grid; place-items: center; }
+.geo-btn:active { background: var(--s2); }
+.geo-btn.busy svg { animation: geopulse 1s ease-in-out infinite; }
+.near:empty { display: none; }
+.near { display: flex; flex-direction: column; gap: 8px; }
+.near-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.near-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 12px; border-radius: 99px; background: var(--s1); border: 1px solid var(--line); font-size: 13px; font-weight: 600; text-align: left; }
+.near-chip small { color: var(--mu); font-weight: 500; }
+.near-chip.known { border-color: rgba(255,176,0,.45); }
+.near-chip.on { background: var(--amber); color: #1a1300; border-color: var(--amber); }
+.near-chip.on small { color: #4a3800; }
+.near-msg { margin: 0; font-size: 12px; color: var(--mu); }
+.maplink { color: var(--amber); }
+@keyframes geopulse { 50% { opacity: .3; transform: scale(.8); } }
 .when { background: var(--s1); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
 .when summary { cursor: pointer; color: var(--mu); font-size: 14px; list-style: none; }
 .when summary::-webkit-details-marker { display: none; }
