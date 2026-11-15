@@ -31,9 +31,14 @@ create table if not exists public.drinks (
   photo_url   text,
   thumb_url   text,
   photo_path  text,
+  lat         double precision check (lat between -90 and 90),
+  lng         double precision check (lng between -180 and 180),
   drunk_at    timestamptz not null default now(),
   created_at  timestamptz not null default now()
 );
+-- Ubicación del sitio (añadido después: seguro de ejecutar en una base ya creada)
+alter table public.drinks add column if not exists lat double precision check (lat between -90 and 90);
+alter table public.drinks add column if not exists lng double precision check (lng between -180 and 180);
 create index if not exists drinks_created_idx on public.drinks (created_at desc);
 create index if not exists drinks_user_drunk_idx on public.drinks (user_id, drunk_at desc);
 
@@ -156,3 +161,36 @@ create policy "photos_delete" on storage.objects for delete to authenticated
   using (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text);
 
 -- Listo 🍻
+
+-- =====================================================================
+--  RONDAS DE BARES (modo tipo Strava) · seguro de ejecutar varias veces
+-- =====================================================================
+create table if not exists public.outings (
+  id          bigint generated always as identity primary key,
+  user_id     uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  started_at  timestamptz not null default now(),
+  ended_at    timestamptz,
+  path        jsonb not null default '[]'::jsonb,   -- [[lat, lng, epoch_seg], ...]
+  distance_m  integer not null default 0 check (distance_m >= 0),
+  created_at  timestamptz not null default now()
+);
+create index if not exists outings_user_idx  on public.outings (user_id, started_at desc);
+create index if not exists outings_ended_idx on public.outings (ended_at desc);
+
+alter table public.drinks add column if not exists outing_id bigint references public.outings(id) on delete set null;
+create index if not exists drinks_outing_idx on public.drinks (outing_id);
+-- El nombre de la bebida ya no se pide (la foto lo dice todo)
+alter table public.drinks alter column name drop not null;
+
+grant select, insert, update, delete on public.outings to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+alter table public.outings enable row level security;
+drop policy if exists "outings_read"   on public.outings;
+drop policy if exists "outings_insert" on public.outings;
+drop policy if exists "outings_update" on public.outings;
+drop policy if exists "outings_delete" on public.outings;
+create policy "outings_read"   on public.outings for select to authenticated using (true);
+create policy "outings_insert" on public.outings for insert to authenticated with check (user_id = auth.uid());
+create policy "outings_update" on public.outings for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy "outings_delete" on public.outings for delete to authenticated using (user_id = auth.uid());
+notify pgrst, 'reload schema';
