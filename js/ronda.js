@@ -116,8 +116,8 @@ export async function renderMap(el, o, drinks = []) {
   if (el._map) { el._map.remove(); el._map = null; }
   const map = L.map(el, { zoomControl: false, attributionControl: true, tap: true });
   el._map = map;
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd', maxZoom: 20, attribution: '© OpenStreetMap © CARTO' }).addTo(map);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
   const line = (o.path || []).map(p => [p[0], p[1]]);
   const bounds = [...line];
   const poly = L.polyline(line, { color: '#FFB000', weight: 5, opacity: .95 }).addTo(map);
