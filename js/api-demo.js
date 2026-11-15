@@ -136,8 +136,8 @@ export function createDemoApi() {
     async deleteComment(id) { db.comments = db.comments.filter(c => c.id !== id); save(); },
     async statsRows() {
       return wait([...db.drinks].sort((a, b) => b.drunk_at.localeCompare(a.drunk_at))
-        .map(({ id, user_id, type, name, place, price, quantity, rating, drunk_at, thumb_url }) =>
-          ({ id, user_id, type, name, place, price, quantity, rating, drunk_at, thumb_url })));
+        .map(({ id, user_id, type, name, place, lat, lng, price, quantity, rating, drunk_at, thumb_url }) =>
+          ({ id, user_id, type, name, place, lat, lng, price, quantity, rating, drunk_at, thumb_url })));
     },
   };
 }

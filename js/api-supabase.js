@@ -5,7 +5,7 @@ const AUTHOR = 'author:profiles!drinks_user_id_fkey(id,username,display_name,ava
 const LIST_SELECT = `*, ${AUTHOR}, likes(user_id), comments(count)`;
 const DETAIL_SELECT = `*, ${AUTHOR}, likes(user_id, profile:profiles(id,username,display_name,avatar_url)),
   comments(id, body, created_at, user_id, author:profiles(id,username,display_name,avatar_url))`;
-const STATS_COLS = 'id,user_id,type,name,place,price,quantity,rating,drunk_at,thumb_url';
+const STATS_COLS = 'id,user_id,type,name,place,lat,lng,price,quantity,rating,drunk_at,thumb_url';
 
 function norm(r) {
   return {

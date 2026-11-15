@@ -2,6 +2,7 @@ import { CONFIG } from './config.js';
 import { TYPES, TYPE, PERIODS, esc, fmtMoney, fmtNum, timeAgo, fmtDateTime, monthLabel, toLocalInput,
   ratingClass, normName, avatarHtml, periodSince, processImage, processAvatar } from './util.js';
 import * as ST from './stats.js';
+import { getPosition, geoGranted, nearbyVenues, knownPlacesNear, fmtDist, round5 } from './geo.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -260,7 +261,7 @@ async function viewDrink(id) {
       <div class="detail-title"><div>${tchip(d)}<h1>${esc(d.name)}</h1></div>${score(d.rating, 'big')}</div>
       <dl class="facts">
         <div><dt>Precio</dt><dd>${fmtMoney(d.price)}${d.quantity > 1 && total != null ? `<small>×${d.quantity} = ${fmtMoney(total)}</small>` : ''}</dd></div>
-        <div><dt>Sitio</dt><dd>${esc(d.place || '—')}</dd></div>
+        <div><dt>Sitio</dt><dd>${d.place && d.lat != null ? `<a class="maplink" href="https://www.google.com/maps/search/?api=1&query=${d.lat},${d.lng}" target="_blank" rel="noopener">${esc(d.place)} ↗</a>` : esc(d.place || '—')}</dd></div>
         <div class="wide"><dt>Cuándo</dt><dd>${esc(fmtDateTime(d.drunk_at))}</dd></div>
       </dl>
       ${d.note ? `<blockquote class="review">${esc(d.note)}</blockquote>` : ''}
@@ -308,7 +309,8 @@ async function viewForm(editId) {
     d = await S.api.getDrink(editId);
     if (!d || d.user_id !== S.me.id) { view().innerHTML = empty('🙅', 'No puedes editar esta ronda'); return; }
   }
-  const st = { type: d?.type || 'cerveza', rating: d?.rating || null, qty: d?.quantity || 1, photo: null,
+  const st = { type: d?.type || 'cerveza', rating: d?.rating || null, qty: d?.quantity || 1, photo: null, geo: null, nearList: [],
+    placeCoords: d && d.lat != null ? { lat: d.lat, lng: d.lng, name: d.place } : null,
     existing: d?.photo_url || null, removeOld: false, when: d ? new Date(d.drunk_at) : null };
   const rows = await getRows().catch(() => []);
 
@@ -338,9 +340,11 @@ async function viewForm(editId) {
         <div class="stepper"><button type="button" data-step="-1" aria-label="Menos">−</button><output id="qty">${st.qty}</output><button type="button" data-step="1" aria-label="Más">+</button></div></div>
     </div>
 
-    <label class="field"><span class="lbl">Sitio</span>
-      <input id="fPlace" list="dlPlaces" maxlength="80" autocomplete="off" placeholder="Bar, terraza, casa…" value="${esc(d?.place || '')}">
-      <datalist id="dlPlaces"></datalist></label>
+    <div class="field"><label class="lbl" for="fPlace">Sitio</label>
+      <div class="place-row"><input id="fPlace" list="dlPlaces" maxlength="80" autocomplete="off" placeholder="Bar, terraza, casa de alguien…" value="${esc(d?.place || '')}">
+        <button type="button" class="geo-btn" id="geoBtn" aria-label="Usar mi ubicación">${I.pin}</button></div>
+      <datalist id="dlPlaces"></datalist>
+      <div class="near" id="near"></div></div>
 
     <label class="field"><span class="lbl">Reseña <small class="muted">(opcional)</small></span>
       <textarea id="fNote" rows="3" maxlength="1000" placeholder="¿Qué tal estaba? ¿Te clavaron?">${esc(d?.note || '')}</textarea></label>
@@ -379,6 +383,41 @@ async function viewForm(editId) {
     $('#fPrice').placeholder = prev ? `última: ${String(prev.price).replace('.', ',')}` : '2,50';
   };
 
+  // Ubicación: sitios guardados por la peña + bares cercanos de OpenStreetMap
+  const near = $('#near');
+  const pickPlace = (p) => {
+    $('#fPlace').value = p.name; st.placeCoords = { lat: p.lat, lng: p.lng, name: p.name };
+    $$('.near-chip').forEach(c => c.classList.toggle('on', c.dataset.name === p.name));
+  };
+  async function locate(auto = false) {
+    const btn = $('#geoBtn'); if (!btn) return; btn.classList.add('busy');
+    try {
+      const pos = await getPosition();
+      st.geo = pos;
+      near.innerHTML = `<p class="near-msg">Buscando sitios cerca…</p>`;
+      const known = knownPlacesNear(rows, pos, 200);
+      let osm = [];
+      try { osm = await nearbyVenues(pos, 150); } catch { /* sin conexión al mapa: solo sitios de la peña */ }
+      if (!$('#near')) return;
+      const seen = new Set(known.map(k => normName(k.name)));
+      const list = [...known, ...osm.filter(o => !seen.has(normName(o.name)))].slice(0, 8);
+      st.nearList = list;
+      near.innerHTML = (list.length ? `<div class="near-chips">${list.map((p, i) => `<button type="button" class="near-chip ${p.n ? 'known' : ''}" data-i="${i}" data-name="${esc(p.name)}">${p.n ? '★ ' : ''}${esc(p.name)} <small>${fmtDist(p.dist)}${p.n ? ` · ${p.n}×` : ''}</small></button>`).join('')}</div>` : '')
+        + `<p class="near-msg">${list.length ? '¿No está?' : 'No encuentro bares aquí.'} Escribe el nombre (p. ej. «Casa de Javi») y quedará guardado en este punto para la próxima vez.</p>`;
+      const cur = $('#fPlace').value.trim();
+      const match = list.find(p => normName(p.name) === normName(cur));
+      if (match) pickPlace(match);
+    } catch (err) {
+      if (!auto) toast(err.message, 'err');
+    } finally { btn.classList.remove('busy'); }
+  }
+  near.onclick = (e) => { const c = e.target.closest('.near-chip'); if (c) pickPlace(st.nearList[+c.dataset.i]); };
+  $('#geoBtn').onclick = () => locate(false);
+  $('#fPlace').addEventListener('input', () => {
+    if (st.placeCoords && st.placeCoords.name !== $('#fPlace').value) { st.placeCoords = null; $$('.near-chip').forEach(c => c.classList.remove('on')); }
+  });
+  if (!d) geoGranted().then(ok => { if (ok) locate(true); });
+
   $('#photoIn').onchange = async (e) => {
     const file = e.target.files?.[0]; if (!file) return;
     $('#pp').classList.add('busy');
@@ -402,7 +441,14 @@ async function viewForm(editId) {
     const rawPrice = $('#fPrice').value.trim().replace(',', '.').replace('€', '');
     const price = rawPrice === '' ? null : Number(rawPrice);
     if (price != null && (isNaN(price) || price < 0 || price > 9999)) return toast('Precio no válido', 'err');
-    const data = { type: st.type, name, place: $('#fPlace').value.trim() || null, price, quantity: st.qty,
+    const placeName = $('#fPlace').value.trim();
+    let lat = null, lng = null;
+    if (placeName) {
+      const known = rows.find(r => r.lat != null && normName(r.place) === normName(placeName));
+      const c = (st.placeCoords && st.placeCoords.name === placeName) ? st.placeCoords : (st.geo || known || null);
+      if (c) { lat = round5(c.lat); lng = round5(c.lng); }
+    }
+    const data = { type: st.type, name, place: placeName || null, lat, lng, price, quantity: st.qty,
       rating: st.rating, note: $('#fNote').value.trim() || null,
       drunk_at: (st.when || new Date()).toISOString() };
     const btn = $('#saveBtn'); btn.disabled = true; btn.classList.add('busy');
