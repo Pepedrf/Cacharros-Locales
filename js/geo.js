@@ -27,30 +27,39 @@ export function distance(a, b) {
 export const fmtDist = (m) => m < 1000 ? `${Math.max(5, Math.round(m / 5) * 5)} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`;
 export const round5 = (x) => Math.round(x * 1e5) / 1e5;
 
-const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
+const VENUE_TAGS = ['bar', 'pub', 'cafe', 'restaurant', 'biergarten', 'nightclub', 'fast_food', 'ice_cream'];
+const OVERPASS = 'https://overpass-api.de/api/interpreter';
 
-// Bares, pubs, cafeterías, restaurantes… con nombre en un radio dado
+async function fetchJson(url, opts = {}, ms = 7000) {
+  const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const r = await fetch(url, { ...opts, signal: ctrl.signal });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+function finish(pos, venues, radius) {
+  const seen = new Set();
+  return venues
+    .filter(v => v.name && v.lat != null && !seen.has(normName(v.name)) && seen.add(normName(v.name)))
+    .map(v => ({ ...v, dist: distance(pos, v) }))
+    .filter(v => v.dist <= radius * 1.5)
+    .sort((a, b) => a.dist - b.dist);
+}
+
+// Bares, pubs, cafeterías, restaurantes… cercanos (Photon/OpenStreetMap; Overpass de respaldo)
 export async function nearbyVenues(pos, radius = 150) {
+  try {
+    const tags = VENUE_TAGS.map(t => `&osm_tag=amenity:${t}`).join('');
+    const j = await fetchJson(`https://photon.komoot.io/reverse?lat=${pos.lat}&lon=${pos.lng}&limit=20&radius=${(radius / 1000).toFixed(2)}${tags}`, {}, 6000);
+    const list = finish(pos, (j.features || []).map(f => ({ name: f.properties?.name, lat: f.geometry?.coordinates?.[1], lng: f.geometry?.coordinates?.[0] })), radius);
+    if (list.length) return list;
+  } catch { /* probamos el respaldo */ }
   const q = `[out:json][timeout:8];nwr(around:${radius},${pos.lat},${pos.lng})["name"]` +
-    `["amenity"~"^(bar|pub|cafe|restaurant|biergarten|nightclub|fast_food|ice_cream)$"];out center 40;`;
-  let lastErr;
-  for (const url of OVERPASS) {
-    try {
-      const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 9000);
-      const r = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q),
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctrl.signal });
-      clearTimeout(t);
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const j = await r.json();
-      const seen = new Set();
-      return j.elements
-        .map(e => ({ name: e.tags.name, lat: e.lat ?? e.center?.lat, lng: e.lon ?? e.center?.lon }))
-        .filter(v => v.lat != null && !seen.has(normName(v.name)) && seen.add(normName(v.name)))
-        .map(v => ({ ...v, dist: distance(pos, v) }))
-        .sort((a, b) => a.dist - b.dist);
-    } catch (e) { lastErr = e; }
-  }
-  throw lastErr;
+    `["amenity"~"^(${VENUE_TAGS.join('|')})$"];out center 40;`;
+  const j = await fetchJson(OVERPASS, { method: 'POST', body: 'data=' + encodeURIComponent(q),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, 8000);
+  return finish(pos, j.elements.map(e => ({ name: e.tags.name, lat: e.lat ?? e.center?.lat, lng: e.lon ?? e.center?.lon })), radius);
 }
 
 // Sitios que la peña ya ha usado cerca (incluye "Casa de Javi" y similares)
