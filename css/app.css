@@ -420,6 +420,8 @@ input[type="datetime-local"] { min-height: 50px; }
 .favs.six { grid-template-columns: repeat(3, 1fr); }
 /* Mapa (Leaflet) */
 .leaflet-container { background: #12161b; font: inherit; }
+.leaflet-container svg { width: auto; height: auto; }
+.o-map .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9) saturate(.6); }
 .dmark span { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-size: 19px; background: var(--c);
   border: 3px solid #0E1013; box-shadow: 0 4px 12px rgba(0,0,0,.5); position: relative; }
 .dmark i { position: absolute; top: -7px; right: -7px; min-width: 18px; height: 18px; border-radius: 9px; background: #fff; color: #111;
